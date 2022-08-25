@@ -5,7 +5,7 @@ const h = hed = document.head
 const c = con = console
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-const play = q => d.querySelector(q).play()
+const play = q => qSelect(q).play()
 
 const setEv = (el, ev, fun) => el.addEventListener(ev, fun)
 const addClass = (el, clazz) => el.classList.add(clazz)
@@ -24,9 +24,24 @@ const getElementsArray = tag => [...qSelectAll(tag)]
 const filterText = (el, txt) => el.textContent.toUpperCase().includes(txt)
 const filterHref = (el, href) => el.href.toUpperCase().includes(href)
 const filterSrc = (el, src) => el.src.toUpperCase().includes(src)
-const getElementsByText = (tag, txt) => getElementsArray(tag).filter(filterText(txt))
-const getElementsByHref = (tag, href) => getElementsArray(tag).filter(filterHref(href))
-const getElementsBySrc = (tag, src) => getElementsArray(tag).filter(filterSrc(src))
+function getElementsByText(tag, txt){
+    let txtFilter = filterText(txt)
+    let elsArr = getElementsArray(tag)
+    let filterArr = elsArr.filter(txtFilter)
+    return filterArr
+}
+function getElementsByHref(tag, href){
+    let hrefFilter = filterHref(href)
+    let elsArr = getElementsArray(tag)
+    let filterArr = elsArr.filter(hrefFilter)
+    return filterArr
+}
+function getElementsBySrc(tag, src){
+    let srcFilter = filterSrc(src)
+    let elsArr = getElementsArray(tag)
+    let filterArr = elsArr.filter(srcFilter)
+    return filterArr
+}
 function getElementByText(tag, txt){
     let elsArr = getElementsByText(tag, txt)
     let el = ambiguousArray(elsArr)
@@ -50,15 +65,15 @@ function ambiguousArray(arr){
 let isDebug = false
 let isMenuVisible = false
 
-const screenshot = (tag = "*", q = "#printscreen") => html2canvas(document.querySelector("*")).then(canvas => document.querySelector(q).appendChild(canvas))
-const toggleDebug = _ => isDebug = document.querySelector("#inToggleDebug").checked
-const toggleShowHide = (q, isHidden) => document.querySelector(q).setAttribute("style", "visibility:" + (isHidden ? "visible": "hidden"))
+const screenshot = (tag = "*", q = "#printscreen") => html2canvas(qSelect("*")).then(canvas => qSelect(q).appendChild(canvas))
+const toggleDebug = _ => isDebug = qSelect("#inToggleDebug").checked
+const toggleShowHide = (q, isHidden) => qSelect(q).setAttribute("style", "visibility:" + (isHidden ? "visible": "hidden"))
 function toggleMenu(){
     isMenuVisible = !isMenuVisible
     toggleShowHide("#divToggledMenu", isMenuVisible)
 }
 
-document.querySelectorAll(".clipboard").forEach(el => el.addEventListener("click", clipboard))
+qSelectAll(".clipboard").forEach(el => el.addEventListener("click", clipboard))
 function clipboard(){
     let coinAddrMap = new Map()
     coinAddrMap.set("ZCASH", "t1XmjzKxe1ndY6sruWrBu828j4XESfq22FA")
@@ -77,16 +92,16 @@ function clipboard(){
 
 //scriptHtmlInjector("https://html2canvas.hertzen.com/dist/html2canvas.min.js")
 function scriptHtmlInjector(scriptSrc = "htmlInjector.js"){
-    let scriptHtmlInjector = document.createElement("script")
+    let scriptHtmlInjector = doc.createElement("script")
     scriptHtmlInjector.src = scriptSrc
-    document.head.append(scriptHtmlInjector)
+    hed.append(scriptHtmlInjector)
 }
 
 //floatMenu()
 function floatMenu(){
-    document.querySelector("#inToggleMenu").addEventListener("click", toggleMenu)
-    document.querySelector("#inToggleDebug").addEventListener("change", toggleDebug)
-    document.querySelector("#btnScreenshot").addEventListener("click", screenshot)
+    qSelect("#inToggleMenu").addEventListener("click", toggleMenu)
+    qSelect("#inToggleDebug").addEventListener("change", toggleDebug)
+    qSelect("#btnScreenshot").addEventListener("click", screenshot)
 }
     
     
