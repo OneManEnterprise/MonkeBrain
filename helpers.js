@@ -368,12 +368,16 @@ async function waitHCaptcha(){
 }
 
 function optionSelect(value){qSelect("option[value=" + value + "]").selected = true}
-function qsubmit(query){qSelect(query).submit()}
+function qsubmit(query){
+    let el = qSelect(query)
+    el.submit()
+}
 function qqsubmit(query){qqSelect(query).then(element => element.submit() ) }
-function qclick(query){qSelect(query).click()}
+function qclick(query){
+    let el = qSelect(query)
+    el.click()
+}
 function qqclick(query){qqSelect(query).then(element => {element.click()})}
-function qSelect(query){return document.querySelector(query)}
-function qSelectAll(query){return document.querySelectorAll(query)}
 async function qqSelect(query){
     let element
     while(!element){
