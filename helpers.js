@@ -30,7 +30,7 @@ const FEES = {
 //CRYPTO ACR
 const ZEC = "ZEC"
 const DSH = "DSH"
-const LTC = "LCT"
+const LTC = "LTC"
 const SOL = "SOL"
 const BCH = "BCH"
 const DOG = "DOG"
