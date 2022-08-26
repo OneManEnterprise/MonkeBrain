@@ -359,7 +359,6 @@ function table(msg, obj = ""){console.table(msg)}
 //const debugging = () => {if(isDebugging) debugger}
 //const debugFunc = async () => {while(!confirm && isDebugging) await wait(SECOND)}
 
-function wait(ms) {return new Promise(resolve => setTimeout(resolve, ms))}
 async function waitHCaptcha(){
     const HCAPTCHA = await qqSelect(Q_HCAPTCHA)
     while(HCAPTCHA.getAttribute("data-hcaptcha-response").length < 1){
