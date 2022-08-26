@@ -103,6 +103,320 @@ function floatMenu(){
     qSelect("#inToggleDebug").addEventListener("change", toggleDebug)
     qSelect("#btnScreenshot").addEventListener("click", screenshot)
 }
+
+//SELECTORS
+const Q_BTN = "button"
+const Q_IN = "input"
+const Q_ADDR = "[name='address']"
+const Q_SUB = "[type='submit']"
+const Q_TXT = "[type='text']"
+
+//QUERIES
+const Q_HCAPTCHA = "iframe[data-hcaptcha-widget-id]"
+const Q_BTN_SUB = Q_BTN + Q_SUB
+const Q_IN_SUB = Q_IN + Q_SUB
+
+//IDS
+const Q_ID_SUB = "#submit"
+
+//CLASSES
+const Q_SUCCESS = ".success"
+const Q_WARN = ".warn"
+
+//TIME
+const MILLI = 1000
+const SECOND = 1 * MILLI
+const MINUTE = 60 * SECOND
+const HOUR = 60 * MINUTE
+
+//WAITS
+const WAIT_HCAPTCHA = 5 * SECOND
+const WAIT_ELEMENT = 3 * SECOND
+
+//DEFAULTS
+const ORIGIN = window.location.origin
+const DAY = new Date(Date.now()).getDate()
+const STARTUP_TIME = performance.now()
+//const STORAGE_ID = 986296337813487616
+const STORAGE_API = "https://jsonblob.com/api/jsonBlob/"
+//////////////////////////////////////////////////////
+
+//VARS
+//let isTracing = true
+let isDebugging = true
+let isDebugLogging = true
+let startupOk = false
+let endupOk = false
+let updateOk = false
+let scriptOk = false
+let scriptSuccess = false
+let scriptAlert = false
+let scriptEndup = false
+let scriptPassed = false
+
+let CURRENT_OBJ = {}
+let CURRENT_OBJS = {}
+//let WEBSITE_OBJ = {}
+let WEBSITE_OBJS = {}
+//let STORED_OBJ = {}
+let STORED_OBJS = {}
+let NEXT_OBJ = {}
+const DEFAULT_WEBSITE_OBJ = {
+    claims:0,
+    lastclaim:-1,
+    maxclaims:Number.MAX_SAFE_INTEGER,
+    cooldown:-1,
+    day:DAY,
+    coin:BTC,
+}
+
+function checkAlerts(){
+    if(qSelectAll(Q_SUCCESS).length > 0) scriptSuccess = true
+    if(qSelectAll(Q_WARN).length > 0) scriptAlert = true
+
+    warn("scriptSuccess:", scriptSuccess)
+    warn("scriptAlert:", scriptAlert)
+}
+async function scriptAlertsHandler(passFunc = () => log("default pass"), failFunc = () => log("default fail"), endFunc = () => log("default end") ){
+    //scrapes .sucess or .warn classes
+    checkAlerts()
+
+    if(scriptSuccess) await passFunc()
+    if(scriptAlert) await failFunc()
+    if(scriptSuccess || scriptAlert) await endFunc()
+}
+async function scriptHandler(websiteScript){
+    //gets the previous executions data stored remotely
+    await getStoredData()
+    log("STORED_OBJS", STORED_OBJS)
+
+    //checks if is going to use past data or default data
+    await startup()
+    log("startupOk:", startupOk)
+
+    //the website specific instructions
+    if(startupOk) await websiteScript()
+    log("scriptOk:", scriptOk)
+
+    //updates data based on execution and moves to next website
+    if(scriptOk || scriptSuccess || scriptAlert) await endup()
+    log("endupOk:", endupOk)
+}
+
+function startup(){
+    //updates execution data based on stored data if is recent
+    updateLocalData()
+    log("updateOk:", updateOk)
+
+    //updates data with default parameters in case of old/null stored data
+    if(!updateOk) {
+        CURRENT_OBJ = WEBSITE_OBJS[ORIGIN]
+        populateObj(CURRENT_OBJ)
+    }
+    log("CURRENT_OBJ:", CURRENT_OBJ)
+
+    //is it possible to run the website script or is in cooldown/max
+    if(!canClaim()) return
+    startupOk = true
+}
+async function endup(){
+    //updates stored data with this execution
+    if(scriptOk || scriptSuccess) updateExecution()
+
+    await storeData()
+
+    //determines the best next website to goto
+    await gotoNextWebsite()
+}
+
+async function getStoredData(){
+    await getPromisedJSON().then( (result) => {STORED_OBJS = JSON.parse(result)} ).catch( (reason) => error("reason:", reason))
+    updateStoredData()
+}
+function updateStoredData(){
+    CURRENT_OBJS = STORED_OBJS
+    if(CURRENT_OBJS[ORIGIN]) CURRENT_OBJ = CURRENT_OBJS[ORIGIN]
+}
+async function storeData(jsonObject = CURRENT_OBJS){
+    await setPromisedJSON(JSON.stringify(jsonObject))
+        .then( (result) => log("result:", result))
+        .catch( (reason) => error("reason:", reason))
+}
+function updateLocalData(){
+    if(!CURRENT_OBJ) return
+    if(!isDataRecent(CURRENT_OBJ.day)) return
+    updateOk = true
+}
+
+function populateObj(objToPopulate = CURRENT_OBJ, objPopulator = DEFAULT_WEBSITE_OBJ){
+    Object.entries(objPopulator).forEach(objPopulatorEntry => updateEntry(objPopulatorEntry, objToPopulate))
+}
+async function updateCurrentObjs(){
+    await Object.entries(CURRENT_OBJS).forEach(entry => updateEntry(entry, CURRENT_OBJS) )
+    await Object.entries(CURRENT_OBJS).forEach(entry => updateWithDefaultvalues(CURRENT_OBJS, entry[0]) )
+}
+function updateEntry(entry, objToUpdate){
+    let entryKey = entry[0]
+    if(!objToUpdate[entryKey])objToUpdate[entryKey] = entry[1]
+}
+function updateWithDefaultvalues(objsToUpdate, objEntry){
+    Object.entries(DEFAULT_WEBSITE_OBJ).forEach(defaultEntry => updateEntry(defaultEntry, objsToUpdate[objEntry]))
+}
+
+function getPromisedJSON(jsonID = 986296337813487600){
+    return new Promise(function (resolve, reject) {
+        let xhttp = new XMLHttpRequest()
+        let url = STORAGE_API + jsonID
+
+        //xhttp.responseType = 'json'
+        xhttp.open('GET', url, true)
+        xhttp.onload = function () {
+            let status = xhttp.status
+            if (status == 200) resolve(xhttp.responseText)
+            else reject(status)
+        }
+        xhttp.send()
+    })
+}
+async function setPromisedJSON(jsonString, jsonID =986296337813487600, resolve = (response) => log("setJSON resolved:", response), reject = (status) => error("setJSON rejected:", status) ){
+    let promise = await new Promise(function (resolve, reject) {
+        let xhttp = new XMLHttpRequest()
+        let url = STORAGE_API + jsonID
+        xhttp.open('PUT', url, true)
+        //xhttp.responseType = 'json'
+        xhttp.setRequestHeader("Content-type", "application/json")
+
+        xhttp.onload = function () {
+            let status = xhttp.status
+            let response = xhttp.responseText
+            if (status == 200)resolve(response)
+            else reject(status)
+        }
+        xhttp.send(jsonString)
+    })
+    return promise
+}
+
+async function gotoNextWebsite(){
+    await getNextObj()
+    log("NEXT_OBJ:", NEXT_OBJ)
+
+    while(!confirm() && isDebugging) {await wait(SECOND); debugger}
+
+    await(5 * SECOND)
+    window.location.href = NEXT_OBJ
+}
+async function getNextObj(){
+    let nextObj = filterSortObj()
+    while(!nextObj){
+        warn("waiting for next for: 1 minute")
+        await wait(MINUTE)
+        nextObj = filterSortObj()
+    }
+    NEXT_OBJ = nextObj
+}
+
+function filterObject(obj, callback) {return Object.fromEntries(Object.entries(obj).filter(([key, val]) => callback(val, key)))}
+function filterSortObj(objs = CURRENT_OBJS){
+    const FILTERED_OBJS = filterObject(objs, filterClaims)
+    debug("FILTERED_OBJS:", FILTERED_OBJS)
+
+    if(Object.entries(FILTERED_OBJS).length == 0) return
+    return getFirstSorted(FILTERED_OBJS, sortClaims)
+}
+function sortClaims(obj){return -obj.cooldown}
+function filterClaims(obj){
+    const NOT_MAX = obj.maxclaims > obj.claims
+    const NOT_COOLDOWN = obj.lastclaim == -1 || Date.now() - obj.lastclaim > obj.cooldown * MINUTE
+    return NOT_MAX && NOT_COOLDOWN
+}
+function getFirstSorted(obj, callback){
+    const SORTED = Object.entries(obj).sort(([key, val]) => callback(val, key))
+    const FIRST_SORTED = SORTED[0]
+    return FIRST_SORTED[0]
+}
+
+function elapsedTime(startTimer){return Math.round((Date.now() - startTimer))}
+function isDataRecent(day = CURRENT_OBJ.day){return day == DAY}
+function isClaimTime(obj = CURRENT_OBJ){return obj.lastclaim < 0 ? true : elapsedTime(obj.lastclaim) > obj.cooldown}
+function canClaim(obj = CURRENT_OBJ){return obj.claims >= obj.maxclaims ? false : isClaimTime(obj)}
+function updateExecution(obj = CURRENT_OBJ){
+    obj.lastclaim = Date.now()
+    obj.claims += 1
+    obj.day = DAY
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+function log(msg, obj = ""){console.log("%c[LOG]", "color:green", msg, obj)}
+function info(msg, obj = ""){console.info("%c[INFO]", "color:cyan", msg, obj)}
+function debug(msg, obj = ""){console.debug("%c[DEBUG]", "color:blue", msg, obj)}
+function warn(msg, obj = ""){console.warn("%c[WARN]", "color:yellow", msg, obj)}
+function error(msg, obj = ""){console.error("%c[ERROR]", "color:red", msg, obj)}
+function trace(msg, obj = ""){console.trace("%c[TRACE]", "color:pink", msg, obj)}
+function table(msg, obj = ""){console.table(msg)}
+//let logLevel = ALL
+
+//const debugging = () => {if(isDebugging) debugger}
+//const debugFunc = async () => {while(!confirm && isDebugging) await wait(SECOND)}
+
+function wait(ms) {return new Promise(resolve => setTimeout(resolve, ms))}
+async function waitHCaptcha(){
+    const HCAPTCHA = await qqSelect(Q_HCAPTCHA)
+    while(HCAPTCHA.getAttribute("data-hcaptcha-response").length < 1){
+        warn("waiting hcaptcha response " + WAIT_HCAPTCHA/MILLI + "s")
+        await wait(WAIT_HCAPTCHA)
+    }
+}
+
+function optionSelect(value){qSelect("option[value=" + value + "]").selected = true}
+function qsubmit(query){qSelect(query).submit()}
+function qqsubmit(query){qqSelect(query).then(element => element.submit() ) }
+function qclick(query){qSelect(query).click()}
+function qqclick(query){qqSelect(query).then(element => {element.click()})}
+function qSelect(query){return document.querySelector(query)}
+function qSelectAll(query){return document.querySelectorAll(query)}
+async function qqSelect(query){
+    let element
+    while(!element){
+        element = qSelect(query)
+        if(element) break
+        else await wait(WAIT_ELEMENT)
+    }
+    debug("element:", element)
+    return element
+}
+
+function triggerEvent(el, type) {
+    try{
+        let ev = document.createEvent('HTMLEvents')
+        ev.initEvent(type, false, true)
+        el.dispatchEvent(ev)
+    }catch(ex){
+        error(ex)
+    }
+}
+function triggerClick(query){
+    let el = document.querySelector(query)
+    triggerEvent(el,'mousedown')
+    triggerEvent(el,'mouseup')
+    el.click()
+}
+
+async function textSubmit(textValue){
+    await inputText(textValue)
+    await triggerClick(Q_SUB)
+}
+async function inputText(value){
+    let addr = qSelect(Q_TXT)
+    addr.value = value
+}
+
+String.prototype.nthLastIndexOf = function(searchString, n){
+    if(this === null) return -1
+    //if(typeof(this) != "string") return -1
+    if(!n || isNaN(n) || n <= 1) return this.lastIndexOf(searchString)
+    return this.lastIndexOf(searchString, this.nthLastIndexOf(searchString, --n) - 1)
+};
     
     
 //CRYPTO ADDRESSES
